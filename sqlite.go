@@ -25,13 +25,11 @@ type Table struct {
 	db   *DB
 }
 
-type SelectStmt struct {
-	from     *Table
-	colunmns interface{}
-	err      error
-	groupBy  string
-	orderBy  string
-	ad       AsendDecent
+type QuerryStmt interface {
+}
+
+type ExecStmt interface {
+	Exec(args ...interface{})
 }
 
 type Where struct {
@@ -46,10 +44,6 @@ func New(dataSourceName string) (*DB, error) {
 	return &DB{db: db}, nil
 }
 
-func (db *DB) Select(columns interface{}) *SelectStmt {
-	return &SelectStmt{colunmns: columns}
-}
-
 func (db *DB) PrepareTable(name string, t reflect.Type) (*Table, error) {
 	return nil, nil
 }
@@ -57,31 +51,4 @@ func (db *DB) PrepareTable(name string, t reflect.Type) (*Table, error) {
 func (t *Table) PrepareGet() (*sql.Stmt, error) {
 
 	return nil, nil
-}
-
-func (s *SelectStmt) From(t *Table) *SelectStmt {
-	if s.err != nil {
-		return s
-	}
-
-	if s.from != nil {
-		s.err = fmt.Errorf("Multiple from isn't allowed. ")
-	} else {
-		s.from = t
-	}
-	return s
-}
-
-func (s *SelectStmt) GroupBy(group string) *SelectStmt {
-	s.groupBy = group
-	return s
-}
-
-func (s *SelectStmt) OrderBy(group string) *SelectStmt {
-	s.orderBy = group
-	return s
-}
-
-func (s *SelectStmt) Error() error {
-	return s.err
 }
