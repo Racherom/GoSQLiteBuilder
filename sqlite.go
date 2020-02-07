@@ -3,7 +3,6 @@ package sqlite
 import (
 	"database/sql"
 	"fmt"
-	"reflect"
 
 	// sqlite
 	_ "github.com/mattn/go-sqlite3"
@@ -44,11 +43,19 @@ func New(dataSourceName string) (*DB, error) {
 	return &DB{db: db}, nil
 }
 
-func (db *DB) PrepareTable(name string, t reflect.Type) (*Table, error) {
+func (db *DB) PrepareTable(name string, t interface{}) (*Table, error) {
 	return nil, nil
 }
 
 func (t *Table) PrepareGet() (*sql.Stmt, error) {
 
 	return nil, nil
+}
+
+func (db *DB) HasTable(t *Table) bool {
+	return db == db
+}
+
+func (db *DB) GetTable(t string) *Table {
+	return &Table{name: t, db: db}
 }

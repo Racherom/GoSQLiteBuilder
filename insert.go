@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"reflect"
@@ -11,8 +12,13 @@ type InsertStmt struct {
 	table   *Table
 	columns []string
 	err     error
-	values  []interface{}
 	query   string
+}
+
+type PreparedInsertStmt struct {
+	columns []string
+	err     error
+	stmt    sql.Stmt
 }
 
 func (db *DB) InsertInto(t *Table) *InsertStmt {
@@ -59,7 +65,6 @@ func (is *InsertStmt) Columns(c interface{}) *InsertStmt {
 				log.Printf("%#v\n", field)
 			}
 		default:
-			log.Printf("%#v\n", k)
 			return &InsertStmt{err: fmt.Errorf("Invalid columntype %s only sting, []string and struct are alowed. ", t.Name())}
 		}
 
@@ -68,28 +73,66 @@ func (is *InsertStmt) Columns(c interface{}) *InsertStmt {
 	return is
 }
 
-func (i *InsertStmt) Exec(args ...interface{}) error {
-	if i.err != nil {
-		return i.err
+func (is *InsertStmt) Exec(values ...interface{}) error {
+	if is.err != nil {
+		return is.err
 	}
 
-	if args == nil {
+	if values == nil {
 		return fmt.Errorf("Couldn't insert empty values. ")
 	}
 
-	if len(args) == 1 {
+	var lastType reflect.Type
+	allSameStruct := true
+
+	for i := range values {
+		valueType := reflect.TypeOf(values[i])
+
+		if (valueType.Kind() != reflect.Struct && valueType.Kind() != reflect.Map) || (lastType != nil && lastType == valueType) {
+			allSameStruct = false
+			break
+		}
+
+		lastType = valueType
+	}
+
+	rows := 1
+	var querryValues []interface{}
+	if allSameStruct {
+		rows = len(values)
+		switch v := values[0].(type) {
+		case map[string]interface{}:
+			log.Printf("map[string]interface{}: %#v\n", v)
+		case struct{}:
+			log.Printf("struct{}: %#v\n", v)
+		default:
+			log.Printf("default: %#v\n", v)
+		}
 
 	} else {
 
 	}
 
+	res, err := is.table.db.db.Exec(is.buildQuery(rows), querryValues...)
+	if err != nil {
+		return fmt.Errorf("Couldnt exec insert: %v", err)
+	}
+	res.LastInsertId()
+
 	return nil
 }
 
-func (i *InsertStmt) Prepare(columns interface{}) {
+func (is *InsertStmt) Prepare(columns interface{}) error {
 	if columns != nil {
-		i.Columns(columns)
+		is.Columns(columns)
+	} else if is.columns == nil {
+		return fmt.Errorf("Couldn't prepare without columns. ")
 	}
+	if is.err != nil {
+		return is.err
+	}
+
+	return nil
 
 }
 
@@ -100,11 +143,31 @@ func trim(in []string) (out []string) {
 	return
 }
 
-func (i *InsertStmt) buildQuery() error {
+func (is *InsertStmt) buildQuery(lenRows int) string {
+
+	rows := []string{}
 
 	values := []string{}
+	for i := 0; i < len(is.columns); i++ {
+		values = append(values, "?")
+	}
 
-	i.query = fmt.Sprintf("INSERT INTO %s %s VALUES %s;", i.table.name, strings.Join(i.columns, ", "), strings.Join(values, ", "))
+	row := fmt.Sprintf("(%s)", strings.Join(values, ", "))
 
+	for i := 0; i < lenRows; i++ {
+		rows = append(rows, row)
+	}
+
+	return fmt.Sprintf("INSERT INTO %s %s VALUES %s;", is.table.name, strings.Join(is.columns, ", "), strings.Join(rows, ", "))
+
+}
+
+// Error returns error
+func (is *InsertStmt) Error() error {
+	return is.err
+}
+
+func (p *PreparedInsertStmt) Exec(values ...interface{}) error {
+	p.stmt.Exec()
 	return nil
 }
