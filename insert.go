@@ -9,6 +9,7 @@ import (
 )
 
 type InsertStmt struct {
+	db      *DB
 	table   *Table
 	columns []string
 	err     error
@@ -22,7 +23,10 @@ type PreparedInsertStmt struct {
 }
 
 func (db *DB) InsertInto(t *Table) *InsertStmt {
-	return &InsertStmt{table: t}
+	if !db.HasTable(t) {
+		return &InsertStmt{err: fmt.Errorf("Couldn't insert table dosn't exist. ")}
+	}
+	return &InsertStmt{db: db, table: t}
 }
 
 func (is *InsertStmt) Columns(c interface{}) *InsertStmt {
@@ -113,7 +117,7 @@ func (is *InsertStmt) Exec(values ...interface{}) error {
 
 	}
 
-	res, err := is.table.db.db.Exec(is.buildQuery(rows), querryValues...)
+	res, err := is.db.db.Exec(is.buildQuery(rows), querryValues...)
 	if err != nil {
 		return fmt.Errorf("Couldnt exec insert: %v", err)
 	}
@@ -136,7 +140,7 @@ func (is *InsertStmt) Prepare(columns interface{}) error {
 
 }
 
-func trim(in []string) (out []string) {
+func trim(in string...) (out []string) {
 	for _, s := range in {
 		out = append(out, strings.Trim(s, " \n\t\r"))
 	}
